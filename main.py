@@ -19,4 +19,3 @@ def health_check():
     }
 
 app.include_router(query_router,prefix="/api/v1")
-regulatory-compliance-intelligence-system

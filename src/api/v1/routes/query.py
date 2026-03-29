@@ -1,6 +1,6 @@
 from fastapi import APIRouter
-from src.api.v1.schemas.query_schema import QueryRequest, QueryResponse
-from src.api.v1.services.query_service import get_similar_docs
+from schemas.query_schema import QueryRequest, QueryResponse
+from services.query_service import get_similar_docs
 
 router = APIRouter()
 
@@ -9,7 +9,8 @@ def query_endpoint(request: QueryRequest):
     
     results = get_similar_docs(request.query)
 
-    return {
-        "query": request.query,
-        "results": results
-    }
+    return QueryResponse(
+        query= request.query,
+        results= results
+    )
+    
