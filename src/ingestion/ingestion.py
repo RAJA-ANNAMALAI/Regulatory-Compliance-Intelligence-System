@@ -53,7 +53,7 @@ def ingest_pdf(file_path):
         model="text-embedding-3-small"
     )'''
 
-if __name__ == "__masin__":
+if __name__ == "__main__":
     ingest_pdf("data/HR_Support_Desk.pdf")
 
 # to execute : $env:PYTHONPATH="."
