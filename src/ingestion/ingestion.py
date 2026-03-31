@@ -52,3 +52,4 @@ def ingest_pdf(file_path):
 
 if __name__=="__main__":
     ingest_pdf("file/HR_Support_Desk_KnowledgeBase.pdf")
+

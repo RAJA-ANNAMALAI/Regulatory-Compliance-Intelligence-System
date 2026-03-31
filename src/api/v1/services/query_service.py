@@ -14,21 +14,28 @@ _raw_conn_str = os.getenv("PG_CONNECTION_STRING", "").replace("postgresql+psycop
 def vector_search(query: str, k: int = 5):
     """Semantic search using LangChain VectorStore"""
     vector_store = get_vector_store()
-    docs = vector_store.similarity_search(query, k=k)
-    return [{"content": doc.page_content, "metadata": doc.metadata} for doc in docs]
+    docs_and_scores = vector_store.similarity_search_with_score(query, k=k)
+
+    results = []
+    for doc, score in docs_and_scores:
+
+        confidence = 1 / (1 + score)
+
+        metadata = doc.metadata.copy()
+        metadata["confidence"] = round(confidence, 4)
+
+        results.append({
+            "content": doc.page_content,
+            "metadata": metadata
+        })
+
+    return results
+
 
 # fts search
 def fts_search(query: str, k: int = 5, collection_name: str = "hr_support_desk") -> list[dict]:
     """
     Keyword search against stored chunks using PostgreSQL tsvector / tsquery / ts_rank.
-
-    Args:
-        query:           User query string (plain text, any format)
-        k:               Number of top results to return
-        collection_name: PGVector collection to search
-
-    Returns:
-        List of dicts with 'content', 'metadata', and 'fts_rank'
     """
     sql = """
         SELECT
@@ -53,38 +60,67 @@ def fts_search(query: str, k: int = 5, collection_name: str = "hr_support_desk")
 
     return [
         {
-            "content":  row["content"],
-            "metadata": row["metadata"],
+            "content": row["content"],
+            "metadata": {
+                **row["metadata"],
+                "confidence": round(min(1.0, float(row["fts_rank"])), 4)
+            },
             "fts_rank": round(float(row["fts_rank"]), 4),
         }
         for row in rows
     ]
 
+
 # hybrid search
 def _hybrid_search(query: str, k: int = 5) -> list[dict]:
     """
     Merge vector and FTS results using Reciprocal Rank Fusion (RRF).
-
-    RRF score for a chunk = sum of 1/(rank + 60) across both result lists.
-    Chunks appearing in both lists score higher than those in only one.
-    The constant 60 prevents top-ranked outliers from dominating.
     """
     vector_store = get_vector_store()
-    vector_docs = vector_store.similarity_search(query, k=k)
+
+    # ✅ use scores for vector
+    vector_docs = vector_store.similarity_search_with_score(query, k=k)
     fts_docs    = fts_search(query, k=k)
 
     rrf_scores: dict[str, float] = {}
     chunk_map:  dict[str, dict]  = {}
 
-    for rank, doc in enumerate(vector_docs):
+    # vector contribution
+    for rank, (doc, _) in enumerate(vector_docs):
         key = doc.page_content[:120]
         rrf_scores[key] = rrf_scores.get(key, 0) + 1 / (60 + rank + 1)
-        chunk_map[key]  = {"content": doc.page_content, "metadata": doc.metadata}
 
+        chunk_map[key] = {
+            "content": doc.page_content,
+            "metadata": doc.metadata.copy()
+        }
+
+    # fts contribution
     for rank, item in enumerate(fts_docs):
         key = item["content"][:120]
         rrf_scores[key] = rrf_scores.get(key, 0) + 1 / (60 + rank + 1)
-        chunk_map[key]  = {"content": item["content"], "metadata": item["metadata"]}
+
+        chunk_map[key] = {
+            "content": item["content"],
+            "metadata": item["metadata"].copy()
+        }
 
     ranked = sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)
-    return [chunk_map[key] for key, _ in ranked[:k]]
+
+    scores = [score for _, score in ranked]
+    min_score = min(scores)
+    max_score = max(scores)
+
+    def normalize(score):
+        if max_score == min_score:
+            return 1.0
+        return (score - min_score) / (max_score - min_score)
+
+    results = []
+    for key, score in ranked[:k]:
+        item = chunk_map[key]
+        item["metadata"]["confidence"] = round(normalize(score), 4)
+
+        results.append(item)
+
+    return results
