@@ -10,7 +10,7 @@ def get_query_docs(query: str, k: int ):
         tools=[keyword_search_tool,semantic_search_tool,hybrid_tool],
         system_prompt="""
         You are a helpful assistant,
-
+        
         You MUST follow these rules:
 
         1. ALWAYS call one of the search tools before answering policy questions.
@@ -28,9 +28,7 @@ def get_query_docs(query: str, k: int ):
         6. Finally, you MUST return your answer as a single string using the following exact template. 
         Use uppercase labels followed by a colon.
 
-        ANSWER: [Insert concise answer here]
-        PAGE: [Insert page number]
-        SOURCE: [Insert filename]
+        ANSWER: [Insert concise answer here] | PAGE: [Insert page number] | SOURCE: [Insert filename]
 
         Do not include any other text or JSON braces.
         
