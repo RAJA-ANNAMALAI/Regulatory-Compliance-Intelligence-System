@@ -10,12 +10,11 @@ PG_CONNECTION = os.getenv("PG_CONNECTION_STRING")
 
 def get_embeddings():
     return GoogleGenerativeAIEmbeddings(
-        model=os.getenv("GOOGLE_EMBEDDINGS_MODEL"),
-        api_key=os.getenv("GOOGLE_API_KEY"),
+        model = os.getenv("GOOGLE_EMBEDDINGS_MODEL"),
+        api_key = os.getenv("GOOGLE_API_KEY"),
         output_dimensionality=1536
     )
 
-# src/core/db.py
 
 vector_store = None
 

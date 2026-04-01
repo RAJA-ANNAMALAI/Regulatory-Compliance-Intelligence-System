@@ -18,3 +18,8 @@ class QueryResult(BaseModel):
 class QueryResponse(BaseModel):
     query: str
     results: List[QueryResult]
+
+# --- Upload ---
+class UploadResponse(BaseModel):
+    message: str
+    filename: str

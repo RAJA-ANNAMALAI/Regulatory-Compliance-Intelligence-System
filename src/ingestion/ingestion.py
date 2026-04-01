@@ -1,54 +1,70 @@
-from dotenv import load_dotenv
+from dotenv import load_dotenv # uv add python-dotenv
 import os
-from langchain_community.document_loaders import PyPDFLoader
+import re
+from langchain_community.document_loaders import PyPDFLoader # uv add langchain-community pypdf
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from langchain_postgres import PGVector
-from langchain_community.document_loaders import UnstructuredPDFLoader
+from langchain_core.documents import Document
+from langchain_google_genai import GoogleGenerativeAIEmbeddings #uv add langchain-googgle-genai
+from langchain_postgres import PGVector # uv add langchain-postgres
 from src.core.db import get_vector_store
+from langchain_community.document_loaders import (
+    PyPDFLoader,
+    TextLoader,
+    UnstructuredWordDocumentLoader
+)
 
-
-
-load_dotenv()
+load_dotenv(override=True)
 
 PG_CONNECTION = os.getenv("PG_CONNECTION_STRING")
 
-def ingest_pdf(file_path):
-    """Ingest a PDF file and save it in vector database"""
-    #load the pdf from data folder and making them as langchain documents
-    loader = PyPDFLoader(file_path)
-    docs = loader.load()
-    print("Pages: "+str(len(docs)))
+def load_document(file_path: str, ext: str):
+    if ext == ".pdf":
+        loader = PyPDFLoader(file_path)
 
-    #enrich the document with metadata
-    for doc in docs:
+    elif ext == ".txt":
+        loader = TextLoader(file_path, encoding="utf-8")
+
+    elif ext == ".docx":
+        loader = UnstructuredWordDocumentLoader(file_path)
+
+    else:
+        raise ValueError(f"Unsupported file format: {ext}")
+
+    return loader.load()
+
+
+
+def ingest_document(file_path: str, ext: str):
+    # Step 1: Load document
+    documents = load_document(file_path, ext)
+    print(f"Loaded {len(documents)} pages")
+
+    # Step 2: Add metadata
+    for doc in documents:
         doc.metadata.update({
-            "source": file_path,
+             "source": file_path,
             "document_extension": "pdf",
             "page": doc.metadata.get("page", None),
             "category": "hr_support_desk",
             "last_updated": os.path.getmtime(file_path)
-
         })
-    
-    # split the text into chunks
+
+    # Step 3: Split into chunks
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,         # character-based chunking
-        chunk_overlap=200       # overlap of 100 characters between chunks to maintain context
+        chunk_size=512,
+        chunk_overlap=100
     )
 
-    chunks = splitter.split_documents(docs)
-    print("Chunks: "+str(len(chunks)))
+    chunks = splitter.split_documents(documents)
+    print(f"Total chunks created: {len(chunks)}")
 
-
-    vector_store = get_vector_store(collection_name="hr_support_desk")
+    # Step 4: Store in PGVector
+    vector_store = get_vector_store()
 
     vector_store.add_documents(chunks)
-    print("Ingestion completed successfully")
 
-    # $env:PYTHONPATH="."; uv run src/ingestion/ingestion.py (execution cmd)
-
+    print("✅ Ingestion completed and stored in DB")
 
 
-if __name__=="__main__":
-    ingest_pdf("file/HR_Support_Desk_KnowledgeBase.pdf")
+    # $env:PYTHONPATH="."
+    # uv run src/ingestion/ingestion.py

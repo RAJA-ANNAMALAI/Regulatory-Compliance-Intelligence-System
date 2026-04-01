@@ -1,11 +1,47 @@
+from src.core.db import get_vector_store
+from src.api.v1.schemas.query_schema import QueryRequest, QueryResponse, QueryResult, UploadResponse
+from langchain.agents import create_agent
+from langchain_core.tools import tool
+from dotenv import load_dotenv
 import os
 import re
+from fastapi import UploadFile
+from src.ingestion.ingestion import ingest_document
 import psycopg
 from psycopg.rows import dict_row
-from dotenv import load_dotenv
-from src.core.db import get_vector_store
+
 
 load_dotenv()
+
+
+UPLOAD_DIR = "temp_uploads"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+ALLOWED_EXTENSIONS = {".pdf", ".txt", ".docx"}
+
+
+def handle_file_upload(file: UploadFile):
+    filename = file.filename
+    ext = os.path.splitext(filename)[1].lower()
+
+    # Step 1: Validate file type
+    if ext not in ALLOWED_EXTENSIONS:
+        raise ValueError(f"Unsupported file type: {ext}")
+
+    file_path = os.path.join(UPLOAD_DIR, filename)
+
+    # Step 2: Save file locally
+    with open(file_path, "wb") as f:
+        f.write(file.file.read())
+
+    # Step 3: Call ingestion pipeline
+    ingest_document(file_path, ext)
+
+    # Step 4 (optional): delete file after ingestion
+    # os.remove(file_path)
+
+    return filename
+
 
 # Database connection setup for raw SQL (FTS)
 _raw_conn_str = os.getenv("PG_CONNECTION_STRING", "").replace("postgresql+psycopg", "postgresql")
