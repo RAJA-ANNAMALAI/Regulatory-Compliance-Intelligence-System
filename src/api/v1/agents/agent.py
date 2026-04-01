@@ -4,10 +4,15 @@ from src.api.v1.tools.vector_search_tool import semantic_search_tool
 from src.api.v1.tools.hybrid_search_tool import hybrid_tool
 from src.api.v1.schemas.query_schema import QueryResult
 import re
+import time
+from dotenv import load_dotenv
+
+load_dotenv(override = True)
+
 
 def get_query_docs(query: str, k: int ):
     my_agent = create_agent(
-        model="google_genai:gemini-3.1-flash-lite-preview",
+        model="google_genai:gemini-2.5-flash",
         tools=[keyword_search_tool,semantic_search_tool,hybrid_tool],
         system_prompt="""
         You are a helpful assistant,
@@ -40,9 +45,11 @@ def get_query_docs(query: str, k: int ):
         """
     )
 
+
+    # This change should fix the error: pass the messages as a dictionary, not a list
     agent_response = my_agent.invoke({
-        "messages": [
-            {"role":"user", "content": query}
+        "messages":[
+            {"role":"user","content":query}
         ]
     })
 
@@ -62,14 +69,14 @@ def get_query_docs(query: str, k: int ):
     page_val     = page_match.group(1).strip() if page_match else "N/A"
     source_val   = source_match.group(1).strip() if source_match else "Unknown"
     raw_conf = conf_match.group(1).strip() if conf_match else "0.0"
-    clean_conf = clean_conf/100.0
+    clean_conf =float(raw_conf) / 100.0
 
 
      
     return [QueryResult(
         content=clean_answer,
         metadata={
-            "page": page_val,
+            "page": int(page_val) + 1,
             "source": source_val,
             "confidence": clean_conf
         }
