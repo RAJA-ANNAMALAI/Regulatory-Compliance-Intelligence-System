@@ -3,6 +3,7 @@ from src.api.v1.tools.fts_search_tool import keyword_search_tool
 from src.api.v1.tools.vector_search_tool import semantic_search_tool
 from src.api.v1.tools.hybrid_search_tool import hybrid_tool
 from src.api.v1.schemas.query_schema import QueryResult
+import re
 
 def get_query_docs(query: str, k: int ):
     my_agent = create_agent(
@@ -31,6 +32,7 @@ def get_query_docs(query: str, k: int ):
         ANSWER: [Insert concise answer here]
         PAGE: [Insert page number]
         SOURCE: [Insert filename]
+        CONFIDENCE SCORE: [Insert cofidence score from metadata]
 
         Do not include any other text or JSON braces.
         
@@ -47,12 +49,28 @@ def get_query_docs(query: str, k: int ):
     last_msg = agent_response["messages"][-1]
 
     if isinstance(last_msg.content, list):
-        answer_content = last_msg.content[0].get("text","")
+        raw_text = last_msg.content[0].get("text","")
     else:
-        answer_content = last_msg.content
+        raw_text = last_msg.content
+
+    answer_match = re.search(r"ANSWER:\s*(.*?)(?=\s*PAGE:|$)", raw_text, re.DOTALL)
+    page_match   = re.search(r"PAGE:\s*(.*?)(\s*SOURCE:|$)", raw_text)
+    source_match = re.search(r"SOURCE:\s*(.*)", raw_text)
+    conf_match = re.search(r"CONFIDENCE:\s*(.*)",raw_text)
+
+    clean_answer = answer_match.group(1).strip() if answer_match else raw_text
+    page_val     = page_match.group(1).strip() if page_match else "N/A"
+    source_val   = source_match.group(1).strip() if source_match else "Unknown"
+    raw_conf = conf_match.group(1).strip() if conf_match else "0.0"
+    clean_conf = clean_conf/100.0
 
 
+     
     return [QueryResult(
-        content= answer_content,
-        metadata= {"source":"agent"}
+        content=clean_answer,
+        metadata={
+            "page": page_val,
+            "source": source_val,
+            "confidence": clean_conf
+        }
     )]

@@ -52,15 +52,20 @@ if st.button("Search", type="primary"):
                             st.markdown("**Answer**")
                             st.write(res.get("content", "No content available"))
 
-                            # Page and Confidence in columns
-                            col1, col2 = st.columns(2)
+                            # Page,Source and Confidence in columns
+                            col1, col2, col3 = st.columns(3)
 
                             with col1:
                                 st.markdown("**Page**")
                                 page_info = res.get("metadata", {}).get("page", "N/A")
                                 st.write(page_info)
-
+                            
                             with col2:
+                                st.markdown("**Source**")
+                                source_info = res.get("metadata", {}).get("source", "N/A")
+                                st.write(source_info)
+
+                            with col3:
                                 st.markdown("**Confidence Score**")
                                 confidence = res.get("metadata", {}).get("confidence", 0.0)
                                 
@@ -93,13 +98,18 @@ if st.session_state.last_results:
             st.markdown("**Answer**")
             st.write(res.get("content", "No content available"))
 
-            col1, col2 = st.columns(2)
+            col1, col2 , col3 = st.columns(3)
             with col1:
                 st.markdown("**Page**")
                 page_info = res.get("metadata", {}).get("page", "N/A")
                 st.write(page_info)
 
             with col2:
+                            st.markdown("**Source**")
+                            source_info = res.get("metadata", {}).get("source", "N/A")
+                            st.write(source_info)
+
+            with col3:
                 st.markdown("**Confidence Score**")
                 confidence = res.get("metadata", {}).get("confidence", 0.0)
                 if isinstance(confidence, (int, float)):
