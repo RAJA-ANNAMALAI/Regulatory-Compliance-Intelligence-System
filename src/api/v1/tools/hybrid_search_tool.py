@@ -9,4 +9,7 @@ def hybrid_tool(query: str,k: int):
     treat it as a hybrid case to balance precision and recall
     """
     docs = _hybrid_search(query,k=k)
-    return "\n\n".join([doc['content'] + str(doc['metadata']) for doc in docs])
+    return "\n\n".join([
+    f"Content: {doc['content']}\nSource: {doc['metadata'].get('source')}\nPage: {doc['metadata'].get('page')}" 
+    for doc in docs
+    ])

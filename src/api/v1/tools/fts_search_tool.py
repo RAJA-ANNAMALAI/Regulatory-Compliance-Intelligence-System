@@ -8,4 +8,7 @@ def keyword_search_tool(query: str,k:  int):
     Best for policy IDs, technical terms, or specific acronyms.
     """
     docs = fts_search(query,k=k)
-    return "\n\n".join([doc['content'] + str(doc['metadata']) for doc in docs])
+    return "\n\n".join([
+    f"Content: {doc['content']}\nSource: {doc['metadata'].get('source')}\nPage: {doc['metadata'].get('page')}" 
+    for doc in docs
+    ])

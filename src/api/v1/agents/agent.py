@@ -1,19 +1,35 @@
 from langchain.agents import create_agent
+from langchain_openai import ChatOpenAI
 from src.api.v1.tools.fts_search_tool import keyword_search_tool
 from src.api.v1.tools.vector_search_tool import semantic_search_tool
 from src.api.v1.tools.hybrid_search_tool import hybrid_tool
 from src.api.v1.schemas.query_schema import QueryResult
 import re
 import time
+import os
 from dotenv import load_dotenv
+from pydantic import BaseModel, Field
 
 load_dotenv(override = True)
 
+class AIResponse(BaseModel):
+    """Structured Response from AI"""
+    ans: str = Field(description="Answer for the given query")
+    page: int = Field(description= "page number")
+    source: str = Field(description= "pdf file_name")
+
 
 def get_query_docs(query: str, k: int ):
+
+    model = ChatOpenAI(
+        model = "gpt-4o-mini",
+        temperature = 0
+    )
+    
     my_agent = create_agent(
-        model="google_genai:gemini-2.5-flash",
+        model= model,
         tools=[keyword_search_tool,semantic_search_tool,hybrid_tool],
+        response_format=AIResponse,
         system_prompt="""
         You are a helpful assistant,
 
@@ -27,19 +43,12 @@ def get_query_docs(query: str, k: int ):
         long numeric IDs / employee numbers.
             3)if the query is short (3 words or fewer), treat it as a hybrid case to balance precision and recall and use hybrid_tool.
         2. NEVER answer without using a tool.
-        3. You SHOULD USE ONLY the retrieved context from that tool's output.
-        4. If answer is not found, say: "Answer not found in documents"
+        3. You SHOULD USE ONLY the retrieved context from that tool's output.Understand the query and retrived chunks fully and
+        give personalized answer, not just pasting the same thing in the document.
+        4. If answer is not found, say: "Answer not found in documents".And give page number and source as NA.
         5. From any tool, you will receive a set of chunks with contains answer for the query along with its metadata.
         You should select the most appropriate chunk as answer and its corressponding metadata.
-        6. Finally, you MUST return your answer as a single string using the following exact template. 
-        Use uppercase labels followed by a colon.
-
-        ANSWER: [Insert concise answer here]
-        PAGE: [Insert page number]
-        SOURCE: [Insert filename]
-
-
-        Do not include any other text or JSON braces.
+       
         
         Be precise and concise.
         """
@@ -53,27 +62,13 @@ def get_query_docs(query: str, k: int ):
         ]
     })
 
-    last_msg = agent_response["messages"][-1]
+    answer : AIResponse = agent_response["structured_response"]
 
-    if isinstance(last_msg.content, list):
-        raw_text = last_msg.content[0].get("text","")
-    else:
-        raw_text = last_msg.content
-
-    answer_match = re.search(r"ANSWER:\s*(.*?)(?=\s*PAGE:|$)", raw_text, re.DOTALL)
-    page_match   = re.search(r"PAGE:\s*(.*?)(\s*SOURCE:|$)", raw_text)
-    source_match = re.search(r"SOURCE:\s*(.*)", raw_text)
-
-    clean_answer = answer_match.group(1).strip() if answer_match else raw_text
-    page_val     = page_match.group(1).strip() if page_match else "N/A"
-    source_val   = source_match.group(1).strip() if source_match else "Unknown"
-
-
-     
+ 
     return [QueryResult(
-        content=clean_answer,
+        content= answer.ans,
         metadata={
-            "page": int(page_val) + 1,
-            "source": source_val
+            "page": answer.page +1,
+            "source": answer.source
         }
     )]

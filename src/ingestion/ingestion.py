@@ -42,7 +42,7 @@ def ingest_document(file_path: str, ext: str):
     # Step 2: Add metadata
     for doc in documents:
         doc.metadata.update({
-             "source": file_path,
+            "source": os.path.basename(file_path),
             "document_extension": "pdf",
             "page": doc.metadata.get("page", None),
             "category": "hr_support_desk",
