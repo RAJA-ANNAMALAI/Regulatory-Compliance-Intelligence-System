@@ -37,7 +37,7 @@ def get_query_docs(query: str, k: int ):
         ANSWER: [Insert concise answer here]
         PAGE: [Insert page number]
         SOURCE: [Insert filename]
-        CONFIDENCE SCORE: [Insert cofidence score from metadata]
+
 
         Do not include any other text or JSON braces.
         
@@ -63,13 +63,10 @@ def get_query_docs(query: str, k: int ):
     answer_match = re.search(r"ANSWER:\s*(.*?)(?=\s*PAGE:|$)", raw_text, re.DOTALL)
     page_match   = re.search(r"PAGE:\s*(.*?)(\s*SOURCE:|$)", raw_text)
     source_match = re.search(r"SOURCE:\s*(.*)", raw_text)
-    conf_match = re.search(r"CONFIDENCE:\s*(.*)",raw_text)
 
     clean_answer = answer_match.group(1).strip() if answer_match else raw_text
     page_val     = page_match.group(1).strip() if page_match else "N/A"
     source_val   = source_match.group(1).strip() if source_match else "Unknown"
-    raw_conf = conf_match.group(1).strip() if conf_match else "0.0"
-    clean_conf =float(raw_conf) / 100.0
 
 
      
@@ -77,7 +74,6 @@ def get_query_docs(query: str, k: int ):
         content=clean_answer,
         metadata={
             "page": int(page_val) + 1,
-            "source": source_val,
-            "confidence": clean_conf
+            "source": source_val
         }
     )]
