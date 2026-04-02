@@ -1,10 +1,9 @@
 from langchain.agents import create_agent
-from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from src.api.v1.tools.fts_search_tool import keyword_search_tool
 from src.api.v1.tools.vector_search_tool import semantic_search_tool
 from src.api.v1.tools.hybrid_search_tool import hybrid_tool
 from src.api.v1.schemas.query_schema import QueryResult
-import re
 import time
 import os
 from dotenv import load_dotenv
@@ -21,9 +20,10 @@ class AIResponse(BaseModel):
 
 def get_query_docs(query: str, k: int ):
 
-    model = ChatOpenAI(
-        model = "gpt-4o-mini",
+    model = ChatGoogleGenerativeAI(
+        model = "gemini-2.5-flash",
         temperature = 0
+        
     )
     
     my_agent = create_agent(

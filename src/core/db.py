@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 from langchain_postgres import PGVector
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
-load_dotenv()
+load_dotenv(override=True)
 
 PG_CONNECTION = os.getenv("PG_CONNECTION_STRING")
 
