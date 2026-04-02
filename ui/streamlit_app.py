@@ -1,112 +1,256 @@
 import streamlit as st
 import requests
+from datetime import datetime
 
+# ========================= PAGE CONFIG =========================
 st.set_page_config(
-    page_title="REGULATORY COMPLIANCE INTELLIGENCE SYSTEM",
-    layout="wide"
+    page_title="Regulatory Compliance Intelligence",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-# Initialize session state for query history
-if "last_results" not in st.session_state:
-    st.session_state.last_results = None
+# ========================= CUSTOM CSS =========================
+st.markdown("""
+<style>
+    /* Hide unnecessary Streamlit elements */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    .stDeployButton {display: none;}
 
-if "queries" not in st.session_state:
-    st.session_state.queries = []
+    /* Main container styling */
+    .main .block-container {
+        padding-top: 2.5rem;
+        padding-bottom: 2rem;
+        max-width: 950px;
+    }
 
-# Sidebar for role selection
-role = st.sidebar.selectbox("Select Role", ["User", "Admin"])
+    /* Sidebar styling */
+    [data-testid="stSidebar"] {
+        background-color: #f8f9fa;
+        border-right: 1px solid #e0e0e0;
+    }
 
-st.title("REGULATORY COMPLIANCE INTELLIGENCE SYSTEM")
+    /* Chat message styling */
+    div[data-testid="stChatMessage"]:has(div[data-testid="chatAvatarUser"]) {
+        background-color: #4F46E5;
+        color: white;
+        margin-left: auto;
+        margin-right: 0;
+        max-width: 78%;
+        border-radius: 12px 12px 4px 12px;
+    }
 
-# Role-based UI layout
-if role == "Admin":
-    # Admin can upload documents
-    st.sidebar.header("Admin Section")
+    div[data-testid="stChatMessage"]:has(div[data-testid="chatAvatarAssistant"]) {
+        background-color: #1E2937;
+        color: #E2E8F0;
+        margin-left: 0;
+        margin-right: auto;
+        max-width: 82%;
+        border-radius: 12px 12px 12px 4px;
+    }
 
-    document = st.file_uploader("Upload Document", type=["pdf", "docx", "txt"])
+    .stChatMessage {
+        padding: 1.1rem 1.3rem;
+        margin-bottom: 0.8rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
 
-    if document:
-        with st.spinner("Uploading document..."):
+    /* Source footer */
+    .source-text {
+        font-size: 0.78rem;
+        color: #94A3B8;
+        margin-top: 0.8rem;
+        padding-top: 0.6rem;
+        border-top: 1px solid #334155;
+    }
+
+    /* Button styling */
+    .stButton button {
+        font-weight: 500;
+        border-radius: 8px;
+    }
+
+    /* Welcome message card */
+    .welcome-card {
+        background-color: #f8fafc;
+        padding: 2rem;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        margin: 1.5rem 0;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# ========================= CONFIG =========================
+API_BASE_URL = "http://127.0.0.1:8000/api/v1"
+
+# ========================= SESSION STATE =========================
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+if "role" not in st.session_state:
+    st.session_state.role = "User"
+
+# ========================= SIDEBAR =========================
+with st.sidebar:
+    st.markdown("### **ReguComply**")
+    st.markdown("---")
+
+    # Role Selection
+    role = st.radio(
+        "Access Level",
+        ["User", "Admin"],
+        horizontal=False,
+        label_visibility="visible"
+    )
+    st.session_state.role = role
+
+    st.markdown("---")
+
+    # Action Buttons
+    if st.button("Clear Conversation", use_container_width=True):
+        st.session_state.messages = []
+        st.rerun()
+
+    if st.session_state.messages:
+        chat_text = "\n\n".join([ 
+            f"{'User' if m['role'] == 'user' else 'Assistant'}: {m['content']}"
+            for m in st.session_state.messages
+        ])
+        st.download_button(
+            label="Export Chat",
+            data=chat_text,
+            file_name=f"regucomply_chat_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+            use_container_width=True
+        )
+
+    st.markdown("---")
+
+# ========================= MAIN CONTENT =========================
+if st.session_state.role == "Admin":
+    st.title("Document Management")
+    st.markdown("Upload regulatory documents to enhance the knowledge base.")
+
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        uploaded_file = st.file_uploader(
+            "Select Document",
+            type=["pdf", "docx", "txt"],
+            help="Supported formats: PDF, DOCX, TXT"
+        )
+
+    if uploaded_file:
+        st.info(f"**File:** {uploaded_file.name}  |  **Size:** {(uploaded_file.size / 1024):.1f} KB")
+
+        if st.button("Upload Document", type="primary", use_container_width=True):
             try:
-                upload_payload = {"file": document}
-                response = requests.post("http://localhost:8000/api/v1/upload", files=upload_payload)
-                
+                files = {'file': (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
+                response = requests.post(f"{API_BASE_URL}/upload", files=files, timeout=60)
+
                 if response.status_code == 200:
                     st.success("Document uploaded successfully!")
                 else:
-                    st.error(f"Failed to upload document. {response.status_code}: {response.text}")
-            except requests.exceptions.RequestException as e:
+                    st.error(f"Upload failed: {response.status_code}")
+            except Exception as e:
                 st.error(f"Error: {str(e)}")
 
-elif role == "User":
-    # User can ask queries
-    st.sidebar.header("User Section")
-    st.header("Ask Questions")
+else:
+    # User Mode - Chat Interface
+    st.title("Regulatory Compliance Intelligence")
+    st.markdown("Ask any question related to regulatory compliance, SEBI, RBI, Companies Act, etc.")
 
-    query = st.text_area(
-        "Enter your question",
-        placeholder="What are the mandatory disclosures under SEBI LODR for related party transactions?",
-        height=120
-    )
+    # Chat Container
+    chat_container = st.container()
 
-    if st.button("Search", type="primary"):
-        if query.strip():
-            with st.spinner("Thinking..."):
+    with chat_container:
+        # Display chat history
+        for message in st.session_state.messages:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
+                if message.get("source"):
+                    source = message["source"]
+                    page_number = message.get("page_number", "N/A")  # Default if no page number is available
+                    st.markdown(
+                        f'<div class="source-text">Source: {source} | Page: {page_number}</div>',
+                        unsafe_allow_html=True
+                    )
+
+    # Welcome Message (shown only when no messages)
+    if not st.session_state.messages:
+        with chat_container:
+            st.markdown("""
+            <div class="welcome-card">
+                <h4>Hello! 👋</h4>
+                <p>I can help you with regulatory compliance queries for Indian financial markets.</p>
+                <p><strong>Try asking:</strong></p>
+                <ul>
+                    <li>What are the disclosure requirements under SEBI LODR?</li>
+                    <li>Summarize insider trading regulations</li>
+                    <li>What are the compliance obligations for listed companies?</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
+
+    # Chat Input
+    if prompt := st.chat_input("Ask a regulatory compliance question..."):
+        # Add user message
+        st.session_state.messages.append({"role": "user", "content": prompt})
+
+        with chat_container:
+            with st.chat_message("user"):
+                st.markdown(prompt)
+
+        # Assistant Response
+        with chat_container:
+            with st.chat_message("assistant"):
                 try:
-                    payload = {"query": query.strip()}
-
                     response = requests.post(
-                        "http://127.0.0.1:8000/api/v1/query",
-                        json=payload,
-                        timeout=30
+                        f"{API_BASE_URL}/query",
+                        json={"query": prompt},
+                        timeout=40
                     )
 
                     if response.status_code == 200:
                         data = response.json()
+                        results = data.get("results", [])
 
-                        # Store query and result in session state
-                        st.session_state.queries.append({"query": query.strip(), "results": data.get("results", [])})
+                        if results:
+                            answer = results[0].get("content", "No answer available.")
+                            source = results[0].get("metadata", {}).get("source", "")
+                            page_number = results[0].get("metadata", {}).get("page", "N/A")  # Changed here
 
+                            st.markdown(answer)
+                            if source:
+                                st.markdown(
+                                    f'<div class="source-text">Source: {source} | Page: {page_number}</div>',
+                                    unsafe_allow_html=True
+                                )
+
+                            st.session_state.messages.append({
+                                "role": "assistant",
+                                "content": answer,
+                                "source": source,
+                                "page_number": page_number
+                            })
+                        else:
+                            no_result = "I couldn't find relevant information for your query."
+                            st.markdown(no_result)
+                            st.session_state.messages.append({
+                                "role": "assistant",
+                                "content": no_result
+                            })
                     else:
-                        st.error(f"API Error: {response.status_code} - {response.text}")
+                        error_msg = f"API Error: {response.status_code}"
+                        st.error(error_msg)
+                        st.session_state.messages.append({
+                            "role": "assistant",
+                            "content": error_msg
+                        })
 
-                except requests.exceptions.ConnectionError:
-                    st.error("Cannot connect to backend. Is the API running on http://127.0.0.1:8000/api/v1/query")
                 except Exception as e:
-                    st.error(f"Error: {str(e)}")
-        else:
-            st.warning("Please enter a query.")
-
-    # Display previous queries and results for the user
-    if st.session_state.queries:
-        st.divider()
-        st.subheader("Search History")
-
-        # Only show the first (or the only) result without "Result 1" etc.
-        for entry in st.session_state.queries:
-            query = entry["query"]
-            results = entry["results"]
-            
-            if results:  # If there is at least one result
-                st.markdown("**Question**")
-                st.info(query)
-
-                # Just show the first (and only) result
-                res = results[0]  # Assuming there is only one result
-                st.markdown("**Answer**")
-                st.write(res.get("content", "No content available"))
-
-                # Page and Source columns (if available)
-                col1, col2 = st.columns(2)
-
-                with col1:
-                    st.markdown("**Page**")
-                    page_info = res.get("metadata", {}).get("page", "N/A")
-                    st.write(page_info)
-
-                with col2:
-                    st.markdown("**Source**")
-                    source_info = res.get("metadata", {}).get("source", "N/A")
-                    st.write(source_info)
-            else:
-                st.write("No results found.")
+                    error_msg = f"Connection error: {str(e)}"
+                    st.error(error_msg)
+                    st.session_state.messages.append({
+                        "role": "assistant",
+                        "content": error_msg
+                    })
