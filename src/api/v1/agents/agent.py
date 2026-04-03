@@ -13,6 +13,7 @@ load_dotenv(override = True)
 
 class AIResponse(BaseModel):
     """Structured Response from AI"""
+
     ans: str = Field(description="Answer for the given query")
     page: int = Field(description= "page number")
     source: str = Field(description= "pdf file_name")
@@ -23,7 +24,6 @@ def get_query_docs(query: str, k: int ):
     model = ChatGoogleGenerativeAI(
         model = "gemini-2.5-flash",
         temperature = 0
-        
     )
     
     my_agent = create_agent(
@@ -54,7 +54,6 @@ def get_query_docs(query: str, k: int ):
         """
     )
 
-
     # This change should fix the error: pass the messages as a dictionary, not a list
     agent_response = my_agent.invoke({
         "messages":[
@@ -64,11 +63,15 @@ def get_query_docs(query: str, k: int ):
 
     answer : AIResponse = agent_response["structured_response"]
 
+    if answer.source == "N/A":
+        answer.page = "N/A"
+    else:
+        answer.page += 1
  
     return [QueryResult(
         content= answer.ans,
         metadata={
-            "page": answer.page +1,
+            "page": answer.page,
             "source": answer.source
         }
     )]
