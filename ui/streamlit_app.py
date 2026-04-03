@@ -2,14 +2,14 @@ import streamlit as st
 import requests
 from datetime import datetime
 
-# ========================= PAGE CONFIG =========================
+# Set up Streamlit page 
 st.set_page_config(
     page_title="Regulatory Compliance Intelligence",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# ========================= CUSTOM CSS =========================
+# Custom styling  
 st.markdown("""
 <style>
     /* Hide unnecessary Streamlit elements */
@@ -79,24 +79,30 @@ st.markdown("""
         border: 1px solid #e2e8f0;
         margin: 1.5rem 0;
     }
+
+    /* Disable button appearance */
+    .disabled-button {
+        cursor: not-allowed;
+        background-color: #dcdcdc;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# ========================= CONFIG =========================
-API_BASE_URL = "http://127.0.0.1:8000/api/v1"
+# Base URL for API calls
+API_BASE_URL = "http://127.0.0.1:8000/api/v1" 
 
-# ========================= SESSION STATE =========================
+# Initialize session state variables if not already present
 if "messages" not in st.session_state:
-    st.session_state.messages = []
-if "role" not in st.session_state:
-    st.session_state.role = "User"
+    st.session_state.messages = [] 
 
-# ========================= SIDEBAR =========================
+if "role" not in st.session_state:
+    st.session_state.role = "User" 
+
 with st.sidebar:
-    st.markdown("### **ReguComply**")
+    st.markdown("### **Regulatory Compliance Intelligent system**")
     st.markdown("---")
 
-    # Role Selection
+    # Role selection
     role = st.radio(
         "Access Level",
         ["User", "Admin"],
@@ -107,12 +113,13 @@ with st.sidebar:
 
     st.markdown("---")
 
-    # Action Buttons
+    # Action buttons
     if st.button("Clear Conversation", use_container_width=True):
-        st.session_state.messages = []
-        st.rerun()
+        st.session_state.messages = []  
+        st.rerun()  # Rerun the app to refresh the state
 
     if st.session_state.messages:
+        # Provide an option to download the chat
         chat_text = "\n\n".join([ 
             f"{'User' if m['role'] == 'user' else 'Assistant'}: {m['content']}"
             for m in st.session_state.messages
@@ -126,12 +133,12 @@ with st.sidebar:
 
     st.markdown("---")
 
-# ========================= MAIN CONTENT =========================
+# Admin section for document management
 if st.session_state.role == "Admin":
     st.title("Document Management")
     st.markdown("Upload regulatory documents to enhance the knowledge base.")
 
-    col1, col2 = st.columns([3, 1])
+    col1, col2 = st.columns([3, 1])  
     with col1:
         uploaded_file = st.file_uploader(
             "Select Document",
@@ -139,43 +146,53 @@ if st.session_state.role == "Admin":
             help="Supported formats: PDF, DOCX, TXT"
         )
 
+    # Handle the file upload process
     if uploaded_file:
         st.info(f"**File:** {uploaded_file.name}  |  **Size:** {(uploaded_file.size / 1024):.1f} KB")
 
-        if st.button("Upload Document", type="primary", use_container_width=True):
-            try:
-                files = {'file': (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
-                response = requests.post(f"{API_BASE_URL}/upload", files=files, timeout=60)
+        # Check and handle upload state to avoid multiple uploads
+        if "is_uploading" not in st.session_state:
+            st.session_state.is_uploading = False  
 
-                if response.status_code == 200:
-                    st.success("Document uploaded successfully!")
-                else:
-                    st.error(f"Upload failed: {response.status_code}")
-            except Exception as e:
-                st.error(f"Error: {str(e)}")
+        # Disable the button once file is being uploaded
+        if st.session_state.is_uploading:
+            st.button("Uploading...", disabled=True, use_container_width=True)  
+        else:
+            if st.button("Upload Document", type="primary", use_container_width=True):
+                st.session_state.is_uploading = True 
+
+                try:
+                    files = {'file': (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
+                    response = requests.post(f"{API_BASE_URL}/upload", files=files, timeout=60)
+
+                    if response.status_code == 200:
+                        st.success("Document uploaded successfully!")
+                    else:
+                        st.error(f"Upload failed: {response.status_code}")
+                except Exception as e:
+                    st.error(f"Error: {str(e)}")
+
+                st.session_state.is_uploading = False  # Reset upload state after completion
 
 else:
-    # User Mode - Chat Interface
+    # User mode
     st.title("Regulatory Compliance Intelligence")
     st.markdown("Ask any question related to regulatory compliance, SEBI, RBI, Companies Act, etc.")
 
-    # Chat Container
     chat_container = st.container()
 
     with chat_container:
-        # Display chat history
         for message in st.session_state.messages:
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
                 if message.get("source"):
                     source = message["source"]
-                    page_number = message.get("page_number", "N/A")  # Default if no page number is available
+                    page_number = message.get("page_number", "N/A")  
                     st.markdown(
                         f'<div class="source-text">Source: {source} | Page: {page_number}</div>',
                         unsafe_allow_html=True
                     )
 
-    # Welcome Message (shown only when no messages)
     if not st.session_state.messages:
         with chat_container:
             st.markdown("""
@@ -191,19 +208,20 @@ else:
             </div>
             """, unsafe_allow_html=True)
 
-    # Chat Input
+    # Chat input field 
     if prompt := st.chat_input("Ask a regulatory compliance question..."):
-        # Add user message
+       
         st.session_state.messages.append({"role": "user", "content": prompt})
 
         with chat_container:
             with st.chat_message("user"):
                 st.markdown(prompt)
 
-        # Assistant Response
+        # Assistant response
         with chat_container:
             with st.chat_message("assistant"):
                 try:
+                    # Send the query to the backend API for processing
                     response = requests.post(
                         f"{API_BASE_URL}/query",
                         json={"query": prompt},
@@ -215,9 +233,10 @@ else:
                         results = data.get("results", [])
 
                         if results:
+                            # Extract content and metadata (source and page number) from the response
                             answer = results[0].get("content", "No answer available.")
                             source = results[0].get("metadata", {}).get("source", "")
-                            page_number = results[0].get("metadata", {}).get("page", "N/A")  # Changed here
+                            page_number = results[0].get("metadata", {}).get("page", "N/A")
 
                             st.markdown(answer)
                             if source:

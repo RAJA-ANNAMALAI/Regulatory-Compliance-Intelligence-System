@@ -45,7 +45,7 @@ def ingest_document(file_path: str, ext: str):
             "source": os.path.basename(file_path),
             "document_extension": "pdf",
             "page": doc.metadata.get("page", None),
-            "category": "hr_support_desk",
+            "category": "regulatory_compliance",
             "last_updated": os.path.getmtime(file_path)
         })
 
@@ -63,8 +63,6 @@ def ingest_document(file_path: str, ext: str):
 
     vector_store.add_documents(chunks)
 
-    print("✅ Ingestion completed and stored in DB")
+    print("Ingestion completed and stored in DB")
 
 
-    # $env:PYTHONPATH="."
-    # uv run src/ingestion/ingestion.py

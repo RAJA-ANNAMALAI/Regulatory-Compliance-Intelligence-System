@@ -10,15 +10,12 @@ from src.ingestion.ingestion import ingest_document
 import psycopg
 from psycopg.rows import dict_row
 
-
 load_dotenv()
-
 
 UPLOAD_DIR = "temp_uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 ALLOWED_EXTENSIONS = {".pdf", ".txt", ".docx"}
-
 
 def handle_file_upload(file: UploadFile):
     filename = file.filename
@@ -37,9 +34,6 @@ def handle_file_upload(file: UploadFile):
     # Step 3: Call ingestion pipeline
     ingest_document(file_path, ext)
 
-    # Step 4 (optional): delete file after ingestion
-    # os.remove(file_path)
-
     return filename
 
 
@@ -48,8 +42,11 @@ _raw_conn_str = os.getenv("PG_CONNECTION_STRING", "").replace("postgresql+psycop
 # vector search
 def vector_search(query: str, k: int = 5):
     """Semantic search using LangChain VectorStore"""
+
     vector_store = get_vector_store()
+
     docs = vector_store.similarity_search(query, k=k)
+
     return [{"content": doc.page_content, "metadata": doc.metadata} for doc in docs]
 
 # fts search
@@ -65,6 +62,7 @@ def fts_search(query: str, k: int = 5, collection_name: str = "hr_support_desk")
     Returns:
         List of dicts with 'content', 'metadata', and 'fts_rank'
     """
+
     sql = """
         SELECT
             e.document                                               AS content,
@@ -81,6 +79,7 @@ def fts_search(query: str, k: int = 5, collection_name: str = "hr_support_desk")
         ORDER BY fts_rank DESC
         LIMIT %(k)s;
     """
+
     with psycopg.connect(_raw_conn_str, row_factory=dict_row) as conn:
         with conn.cursor() as cur:
             cur.execute(sql, {"query": query, "collection": collection_name, "k": k})
@@ -104,6 +103,7 @@ def _hybrid_search(query: str, k: int = 5) -> list[dict]:
     Chunks appearing in both lists score higher than those in only one.
     The constant 60 prevents top-ranked outliers from dominating.
     """
+
     vector_store = get_vector_store()
     vector_docs = vector_store.similarity_search(query, k=k)
     fts_docs    = fts_search(query, k=k)
@@ -122,4 +122,5 @@ def _hybrid_search(query: str, k: int = 5) -> list[dict]:
         chunk_map[key]  = {"content": item["content"], "metadata": item["metadata"]}
 
     ranked = sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)
+    
     return [chunk_map[key] for key, _ in ranked[:k]]
